@@ -9,7 +9,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.config.config_loader import load_config
-from src.data.download_corpora import clone_repo
+from src.data.download_corpora import clone_repo, get_repo_info
 from src.utils.text_preprocessing import normalize_text
 
 config = load_config()
@@ -21,10 +21,10 @@ lexicon_output = config["lexicon_dir_output"]
 lexicon = set()
 
 
-def extract_transcription_from_xml():
+def extract_transcription_from_xml(repo):
     ns = {"alto": "http://www.loc.gov/standards/alto/ns-v4#"}
     transcription = []
-    for roots, dirs, files in os.walk(f"{corpora_dir}cremma-medieval"):
+    for roots, dirs, files in os.walk(f"{corpora_dir}{repo}"):
         for file in files:
             if file.endswith("chocomufin.xml"):
                 file_dir = f"{roots}/{file}"
