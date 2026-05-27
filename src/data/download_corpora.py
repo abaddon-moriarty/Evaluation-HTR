@@ -44,21 +44,40 @@ def download_files(owner, repo, path="", save_dir=""):
 
     items = response.json()
 
-    for item in tqdm(items):
+    files_here = [
+        item
+        for item in items
+        if item["type"] == "file" and item["name"].endswith((".xml", ".jpg"))
+    ]
+
+    pbar = tqdm(
+        total=len(files_here),
+        unit="file",
+        desc=f"Téléchargement {repo}/{path}",
+        leave=False,
+    )
+
+    for item in items:
         if item["type"] == "dir":
-            if item["name"] != "env":
-                print(item["name"])
-                download_files(owner, repo, item["path"], save_dir)
+            if item["name"] in (".github", "workflows", "badges", "env"):
+                continue
+            local_subdir = os.path.join(save_dir, item["name"])
+            os.makedirs(local_subdir, exist_ok=True)
+
+            tqdm.write(f"Exploration du sous-dossier {local_subdir}...")
+            download_files(owner, repo, item["path"], save_dir)
 
         elif item["type"] == "file":
             if item["name"].endswith((".xml", ".jpg")):
-                file_url = item["download_url"]
-                relative_path = item["path"]
-                local_path = os.path.join(save_dir, relative_path)
+                local_path = os.path.join(save_dir, item["path"])
+                if os.path.exists(local_path):
+                    continue
+                file_data = requests.get(item["download_url"], headers=headers).content
                 os.makedirs(os.path.dirname(local_path), exist_ok=True)
-                file_data = requests.get(file_url, headers=headers).content
                 with open(local_path, "wb") as f:
                     f.write(file_data)
+                pbar.update(1)
+    pbar.close()
 
 
 def clone_repo(github_url):
@@ -66,13 +85,9 @@ def clone_repo(github_url):
     save_dir = f"{corpora_dir}{repo}"
 
     if os.path.exists(save_dir):
-        print(
-            f"Folder {save_dir} already exists. Will not download. "
-            "If this is an error please download it manually and add it to the correct directory."
-        )
-        return
+        print(f"Folder {save_dir} already exists")
 
-    os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
 
     download_files(owner, repo, path="", save_dir=save_dir)
 
