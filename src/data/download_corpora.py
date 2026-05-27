@@ -68,7 +68,7 @@ def download_files(owner, repo, path="", save_dir=""):
             download_files(owner, repo, item["path"], save_dir)
 
         elif item["type"] == "file":
-            if item["name"].endswith((".xml", ".jpg")):
+            if item["name"].endswith((".xml", ".jpg", ".jpeg")):
                 local_path = os.path.join(save_dir, item["path"])
                 if os.path.exists(local_path):
                     continue

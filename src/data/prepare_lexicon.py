@@ -18,15 +18,13 @@ corpora = config["lexicon_corpora_source"]
 corpora_dir = config["lexicon_corpora_dir_input"]
 lexicon_output = config["lexicon_dir_output"]
 
-lexicon = set()
-
 
 def extract_transcription_from_xml(repo):
     ns = {"alto": "http://www.loc.gov/standards/alto/ns-v4#"}
     transcription = []
     for roots, _, files in os.walk(f"{corpora_dir}{repo}"):
         for file in files:
-            if file.endswith("chocomufin.xml"):
+            if file.endswith(".xml"):
                 file_dir = f"{roots}/{file}"
                 tree = ET.parse(file_dir)
                 root = tree.getroot()
