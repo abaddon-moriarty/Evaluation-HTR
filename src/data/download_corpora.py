@@ -62,19 +62,16 @@ def download_files(owner, repo, path="", save_dir=""):
 
 def clone_repo(github_url):
     owner, repo = get_repo_info(github_url)
-    save_dir = f"./data/corpora/{repo}"
+    save_dir = f"{corpora_dir}{repo}"
 
-    os.makedirs(save_dir, exist_ok=True)
-
-    if os.path.exists(save_dir) and os.path.isdir(save_dir):
-        pass
-
-    if os.path.isdir(save_dir):
+    if os.path.exists(save_dir):
         print(
             f"Folder {save_dir} already exists. Will not download. "
             "If this is an error please download it manually and add it to the correct directory."
         )
         return
+
+    os.makedirs(save_dir)
 
     download_files(owner, repo, path="", save_dir=save_dir)
 
