@@ -24,7 +24,7 @@ lexicon = set()
 def extract_transcription_from_xml(repo):
     ns = {"alto": "http://www.loc.gov/standards/alto/ns-v4#"}
     transcription = []
-    for roots, dirs, files in os.walk(f"{corpora_dir}{repo}"):
+    for roots, _, files in os.walk(f"{corpora_dir}{repo}"):
         for file in files:
             if file.endswith("chocomufin.xml"):
                 file_dir = f"{roots}/{file}"
@@ -35,7 +35,6 @@ def extract_transcription_from_xml(repo):
 
                 contents = [elem.get("CONTENT", "") for elem in string_elements]
                 transcription.append(" ".join(contents))
-    # print(transcription)
     return " ".join(transcription)
 
 
@@ -57,23 +56,34 @@ def create_lexicon():
     4.6 – Gérer les erreurs de téléchargement
     Si un dépôt est inaccessible, affichez un message d’avertissement mais continuez avec les autres. Vous pouvez aussi proposer à l’utilisateur de télécharger manuellement et de placer les fichiers aux bons endroits.
     """
+    lexicon = set()
+    if os.path.exists(lexicon_output):
+        with open(lexicon_output, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    lexicon.add(line.strip())
+
     pbar = tqdm(corpora, unit="repository")
     for repository in pbar:
         pbar.set_description_str(f"Cloning {repository}")
         clone_repo(repository)
 
+        _, repo = get_repo_info(repository)
+
         pbar.set_description_str("Extracting transcription")
-        transcription = extract_transcription_from_xml()
+        transcription = extract_transcription_from_xml(repo)
 
         normalized_transcription = normalize_text(transcription)
-        print(normalized_transcription)
+        # print(normalized_transcription)
 
         pbar.set_description_str("Extracting lexicon")
 
-        lexicon.update(extract_lexicon_from_transcription(normalized_transcription))
+        new_words = extract_lexicon_from_transcription(normalized_transcription)
+        lexicon.update(new_words)
 
-        with open(lexicon_output, "w+", encoding="utf-8") as f:
-            f.write("\n".join(sorted(lexicon)))
+    os.makedirs(os.path.dirname(lexicon_output), exist_ok=True)
+    with open(lexicon_output, "w", encoding="utf-8") as f:
+        f.write("\n".join(sorted(lexicon)))
 
 
 if __name__ == "__main__":
