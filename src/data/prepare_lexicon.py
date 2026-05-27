@@ -35,7 +35,7 @@ def extract_transcription_from_xml():
 
                 contents = [elem.get("CONTENT", "") for elem in string_elements]
                 transcription.append(" ".join(contents))
-    print(transcription)
+    # print(transcription)
     return " ".join(transcription)
 
 
@@ -57,15 +57,23 @@ def create_lexicon():
     4.6 – Gérer les erreurs de téléchargement
     Si un dépôt est inaccessible, affichez un message d’avertissement mais continuez avec les autres. Vous pouvez aussi proposer à l’utilisateur de télécharger manuellement et de placer les fichiers aux bons endroits.
     """
-
-    for repository in tqdm(corpora, unit="corpus"):
+    pbar = tqdm(corpora, unit="repository")
+    for repository in pbar:
+        pbar.set_description_str(f"Cloning {repository}")
         clone_repo(repository)
+
+        pbar.set_description_str("Extracting transcription")
         transcription = extract_transcription_from_xml()
+
         normalized_transcription = normalize_text(transcription)
         print(normalized_transcription)
+
+        pbar.set_description_str("Extracting lexicon")
+
         lexicon.update(extract_lexicon_from_transcription(normalized_transcription))
-    with open(lexicon_output, "w+", encoding="utf-8") as f:
-        f.write("\n".join(sorted(lexicon)))
+
+        with open(lexicon_output, "w+", encoding="utf-8") as f:
+            f.write("\n".join(sorted(lexicon)))
 
 
 if __name__ == "__main__":

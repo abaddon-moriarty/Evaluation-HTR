@@ -16,8 +16,8 @@ load_dotenv()
 config = load_config()
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-corpora = config["lexicon_corpora"]
-corpora_dir = config["lexicon_corpora_dir"]
+corpora = config["lexicon_corpora_source"]
+corpora_dir = config["lexicon_corpora_dir_input"]
 
 
 headers = {}
