@@ -1,0 +1,21 @@
+# Paths
+data_root: "./data"
+
+
+# Lexicon source
+lexicon_corpora_dir_input: "./data/corpora/"
+lexicon_corpora_source : [
+  "https://github.com/htR-United/cremma-medieval",
+  "https://github.com/HTR-United/CREMMA-MSS-15/tree/LazareDeBaif", 
+  "https://github.com/HTR-United/CREMMA-MSS-16", 
+  "https://github.com/HTR-United/CREMMA-MSS-17",
+  "https://github.com/CIHAM-HTR/Liber",
+  "https://github.com/CIHAM-HTR/Fabliaux",
+  "https://github.com/Gallicorpora/HTR-incunable-15e-siecle",
+  "https://github.com/Gallicorpora/HTR-MSS-15e-Siecle",
+  "https://github.com/Gallicorpora/HTR-imprime-gothique-16e-siecle",
+  "https://github.com/HTRomance-Project/medieval-french"
+   ]
+
+lexicon_dir_output: "./data/lexicon/"
+lexicon_output_file: "general_lexicon.txt"
