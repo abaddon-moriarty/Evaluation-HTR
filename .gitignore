@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Corpora used to build lexicon - rebuild from command line
+data/corpora/*
