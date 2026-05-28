@@ -1,0 +1,97 @@
+import os
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+from dotenv import load_dotenv
+from tqdm import tqdm
+
+# Permet l'import depuis la racine du projet
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from src.config.config_loader import load_config
+
+load_dotenv()
+config = load_config()
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+corpora = config["lexicon_corpora_source"]
+corpora_dir = config["lexicon_corpora_dir_input"]
+
+
+headers = {}
+if GITHUB_TOKEN:
+    headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    headers["Accept"] = "application/vnd.github+json"
+
+
+def get_repo_info(github_url):
+    parts = urlparse(github_url).path.strip("/").split("/")
+    owner = parts[0]
+    repo = parts[1]
+    return owner, repo
+
+
+def download_files(owner, repo, path="", save_dir=""):
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+
+    response = requests.get(api_url, headers=headers)
+
+    if response.status_code != 200:
+        print("Erreur API:", response.text)
+        return
+
+    items = response.json()
+
+    files_here = [
+        item
+        for item in items
+        if item["type"] == "file" and item["name"].endswith((".xml", ".jpg"))
+    ]
+
+    pbar = tqdm(
+        total=len(files_here),
+        unit="file",
+        desc=f"Téléchargement {repo}/{path}",
+        leave=False,
+    )
+
+    for item in items:
+        if item["type"] == "dir":
+            if item["name"] in (".github", "workflows", "badges", "env"):
+                continue
+            local_subdir = os.path.join(save_dir, item["name"])
+            os.makedirs(local_subdir, exist_ok=True)
+
+            tqdm.write(f"Exploration du sous-dossier {local_subdir}...")
+            download_files(owner, repo, item["path"], save_dir)
+
+        elif item["type"] == "file":
+            if item["name"].endswith((".xml", ".jpg", ".jpeg")):
+                local_path = os.path.join(save_dir, item["path"])
+                if os.path.exists(local_path):
+                    continue
+                file_data = requests.get(item["download_url"], headers=headers).content
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                with open(local_path, "wb") as f:
+                    f.write(file_data)
+                pbar.update(1)
+    pbar.close()
+
+
+def clone_repo(github_url):
+    owner, repo = get_repo_info(github_url)
+    save_dir = f"{corpora_dir}{repo}"
+
+    if os.path.exists(save_dir):
+        print(f"Folder {save_dir} already exists")
+
+    os.makedirs(save_dir, exist_ok=True)
+
+    download_files(owner, repo, path="", save_dir=save_dir)
+
+
+if __name__ == "__main__":
+    for repository in tqdm(corpora, unit="corpus"):
+        clone_repo(repository)
