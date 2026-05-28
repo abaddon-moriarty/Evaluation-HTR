@@ -1,3 +1,4 @@
+import argparse
 import os
 import re
 import sys
@@ -9,20 +10,43 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.config.config_loader import load_config
-from src.data.download_corpora import clone_repo, get_repo_info
+from src.data.download_corpora import clone_repo
 from src.utils.text_preprocessing import normalize_text
 
 config = load_config()
 
 corpora = config["lexicon_corpora_source"]
 corpora_dir = config["lexicon_corpora_dir_input"]
-lexicon_output = config["lexicon_dir_output"]
+lexicon_output_file = config["lexicon_output_file"]
+lexicon_dir_output = config["lexicon_dir_output"]
 
 
-def extract_transcription_from_xml(repo):
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--download",
+    action="store_true",
+    help="Will download corpora from the `lexicon_corpora_source` listed in the config file. No download by default.",
+)
+parser.add_argument(
+    "--input_dir",
+    type=str,
+    default=corpora_dir,
+    help=f"Specify the dir to generate the lexicon from. Default is: {corpora_dir}",
+)
+parser.add_argument(
+    "--output",
+    type=str,
+    default=lexicon_output_file,
+    help=f"Specify the lexicon output file name. Will generate in {lexicon_dir_output}. Default name is: {lexicon_output_file}",
+)
+
+args = parser.parse_args()
+
+
+def extract_transcription_from_xml(repo_path):
     ns = {"alto": "http://www.loc.gov/standards/alto/ns-v4#"}
     transcription = []
-    for roots, _, files in os.walk(f"{corpora_dir}{repo}"):
+    for roots, _, files in os.walk(f"{repo_path}"):
         for file in files:
             if file.endswith(".xml"):
                 file_dir = f"{roots}/{file}"
@@ -43,38 +67,53 @@ def extract_lexicon_from_transcription(transcription):
 
 
 def create_lexicon():
-    """
-    Parcourt récursivement tous les dossiers des siècles.
-    Pour chaque fichier .txt :
-    Applique normalize_text.
-    Extrait les mots via regex (lettres + accents + ligatures).
-    Ajoute chaque mot à un ensemble global.
-    Sauvegarde l’ensemble trié dans data/lexicon_global.txt.
-    (Optionnel) Sauvegarde aussi un lexique par siècle si vous avez activé l’option.
-    4.6 – Gérer les erreurs de téléchargement
-    Si un dépôt est inaccessible, affichez un message d’avertissement mais continuez avec les autres. Vous pouvez aussi proposer à l’utilisateur de télécharger manuellement et de placer les fichiers aux bons endroits.
-    """
+    global corpora_dir, lexicon_output_file
+
+    if args.output:
+        lexicon_output_file = args.output
+
     lexicon = set()
+
+    lexicon_output = os.path.join(lexicon_dir_output, lexicon_output_file)
+
     if os.path.exists(lexicon_output):
         with open(lexicon_output, "r", encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     lexicon.add(line.strip())
 
-    pbar = tqdm(corpora, unit="repository")
-    for repository in pbar:
-        pbar.set_description_str(f"Cloning {repository}")
-        clone_repo(repository)
+    if args.download:
+        download_pbar = tqdm(corpora, unit="repository")
+        for repository in download_pbar:
+            download_pbar.set_description_str(f"Cloning {repository}")
+            clone_repo(repository)
+    else:
+        print("\nSkipping download. Generating lexicon.")
 
-        _, repo = get_repo_info(repository)
+    if args.input_dir and (args.input_dir != corpora_dir):
+        corpora_dir = args.input_dir
+        if not os.path.isdir(corpora_dir):
+            print(f"Erreur : {corpora_dir} n'existe pas")
+            return
+        corpora = [
+            d
+            for d in os.listdir(corpora_dir)
+            if os.path.isdir(os.path.join(corpora_dir, d))
+        ]
+        if not corpora:
+            print("Aucun sous-dossier trouvé")
+            return
 
-        pbar.set_description_str("Extracting transcription")
-        transcription = extract_transcription_from_xml(repo)
+    lexicon_pbar = tqdm(corpora, unit="corpus")
+    for repository in lexicon_pbar:
+        repo_path = os.path.join(corpora_dir, repository)
+        lexicon_pbar.set_description_str(f"Extracting transcription from {repository}")
+        transcription = extract_transcription_from_xml(repo_path)
 
         normalized_transcription = normalize_text(transcription)
         # print(normalized_transcription)
 
-        pbar.set_description_str("Extracting lexicon")
+        lexicon_pbar.set_description_str("Extracting lexicon")
 
         new_words = extract_lexicon_from_transcription(normalized_transcription)
         lexicon.update(new_words)
