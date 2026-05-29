@@ -5,8 +5,8 @@
 
 ## Current status (May 2026)
 - [x] **Lexicon builder** – downloads medieval corpora from GitHub (CREMMA‑medieval, CREMMA‑MSS‑15/16/17, etc.) and builds a word list from ALTO XML files.
-- [ ] **Lexicon‑based metrics** (token ratio, n‑gram ratio) – planned
-- [ ] **Statistical language model perplexity with KenLM** – planned
+- [x] **Lexicon‑based metrics** – token ratio and character n‑gram ratio (implemented in `src/metrics/lexical.py`).
+- [x] **Statistical language model perplexity with KenLM** – implemented in `src/metrics/perplexity.py`. Training instructions are provided below.
 - [ ] **Pseudo‑perplexity with BERT (masked language model)** – planned
 - [ ] **Model ranking & Spearman correlation** to validate metrics against a reference ranking – planned
 - [ ] **Integrating modularity** easily adding custom metrics – planned
@@ -84,6 +84,150 @@ Simply place your ALTO XML files inside a folder (or a tree of subfolders), then
 
 > The transcription is pulled from xml files, extracting `<String CONTENT>` tag. If using custom corpora, make sure they contain this tag.
 
+## Adding lexical metrics (token ratio & character n‑gram ratio)
+
+Once you have a lexicon (e.g., `data/lexicon/global_lexicon.txt`), you can evaluate how much of a transcription’s vocabulary is covered by known words (token ratio) and how well its character sequences match substrings of real words (n‑gram ratio).
+
+### Implementation files
+- `src/metrics/lexical.py` – contains `compute_token_ratio` and `compute_ngram_ratios`.
+- `src/utils/text_preprocessing.py` – provides `normalize_text` and `tokenize_words`.
+
+
+### How to use
+
+```python
+from src.metrics.lexical import load_lexicon, compute_token_ratio, compute_ngram_ratios
+
+# Load the lexicon (set of words)
+lexicon = load_lexicon("data/lexicon/global_lexicon.txt")
+
+# Read a student transcription
+with open("student_transcription.txt", "r", encoding="utf-8") as f:
+    transcript = f.read()
+
+# Token ratio (percentage of known words)
+token_ratio = compute_token_ratio(transcript, lexicon)
+print(f"Token ratio: {token_ratio*100:.2f}%")
+
+# Character n‑gram ratio (average for n=2…7)
+ngram_ratio = compute_ngram_ratios(transcript, lexicon)
+print(f"Character n‑gram ratio: {ngram_ratio*100:.2f}%")
+```
+
+### What the numbers mean
+
+- **Token ratio** – high values (e.g., > 70%) indicate that most words are already in the lexicon, suggesting a clean transcription with few out‑of‑vocabulary or erroneous words.
+- **Character n‑gram ratio** – usually slightly lower than token ratio, because it considers every short character sequence. A high value (close to token ratio) means the transcription uses plausible letter combinations typical of the language.
+
+Both metrics are **unsupervised** – they do not require ground truth. Lower ratios generally signal more errors or unusual spellings, but they are most useful when **comparing multiple models** on the same pages.
+
+
+---
+
+## Statistical language model perplexity with KenLM
+
+Perplexity measures how predictable a text is according to a language model. Lower perplexity means the transcription follows the patterns of the training corpus (more “fluent”).
+
+### Step 1 – Install KenLM and train a custom language model
+
+We use **KenLM** because it is fast and works well with n‑gram models on medieval texts.
+
+#### 1.1 Install system dependencies (Fedora / Linux)
+
+```bash
+sudo dnf install -y gcc-c++ cmake make boost-devel eigen3-devel xz-devel
+```
+
+(For Debian/Ubuntu: `sudo apt install build-essential cmake libboost-system-dev libeigen3-dev liblzma-dev`)
+
+#### 1.2 Clone and compile KenLM
+
+```bash
+git clone https://github.com/kpu/kenlm.git
+cd kenlm
+mkdir -p build && cd build
+cmake ..
+make -j 4
+```
+
+The tools `lmplz` (training) and `build_binary` (conversion) will be in `kenlm/build/bin/`. You may add this directory to your `PATH` for convenience.
+
+#### 1.3 Prepare a training corpus
+
+You need a large collection of plain‑text lines (one line = one manuscript line or one sentence) that represents the language of your evaluation pages.  
+A practical method: use the same ALTO XML files you already downloaded for the lexicon, but extract **one line per `<TextLine>`** (not per file).
+
+Create a script (e.g., `scripts/prepare_lm_corpus.py`) that:
+
+- Walks through `data/corpora/`
+- For every `.xml` file, extracts `<TextLine>` and inside it, joins all `<String CONTENT>` values with spaces.
+- Normalises each line using `normalize_text_for_lm` (lowercase, digits → `<num>`, remove punctuation).
+- Writes each line to `corpus.txt`.
+
+Then run:
+
+```bash
+python scripts/prepare_lm_corpus.py   # (you need to write it)
+```
+
+#### 1.4 Train the n‑gram model (trigram recommended for medieval data)
+
+```bash
+./kenlm/build/bin/lmplz -o 3 --verbose_header \
+    --text ./kenlm_data/corpus.txt \
+    --arpa ./kenlm_data/model.arpa
+```
+
+If you encounter a `BadDiscountException` (due to sparse data), add `--discount_fallback`.
+
+#### 1.5 Convert to binary for fast loading
+
+```bash
+./kenlm/build/bin/build_binary ./kenlm_data/model.arpa ./kenlm_data/model.bin
+```
+
+#### 1.6 Update `config.yaml`
+
+Add or verify this entry:
+
+```yaml
+perplexity:
+  lm_corpus_path: "./kenlm_data/corpus.txt"   # optional, for reference
+  lm_model_path: "./kenlm_data/model.bin"
+```
+
+### Step 2 – Compute perplexity on transcriptions
+
+We provide `src/metrics/perplexity.py` with a `PerplexityScorer` class.
+
+```python
+from src.metrics.perplexity import PerplexityScorer
+
+scorer = PerplexityScorer("kenlm_data/model.bin")
+with open("student_transcription.txt", "r") as f:
+    text = f.read()
+ppl = scorer.compute_perplexity(text)
+print(f"Perplexity: {ppl:.2f}")
+```
+
+### Step 3 – Interpreting perplexity
+- **Lower is better** – a perfect copy of the training text would have the lowest possible perplexity.
+- Absolute values are not meaningful; you **compare perplexities of different models** on the same set of unlabeled pages. The model with the lowest perplexity is considered best by this metric.
+
+---
+
+## Next steps: combining metrics and ranking models
+Once we have a small ground‑truth validation set, we can compute the Spearman correlation between perplexity ranking and CER ranking to verify that perplexity aligns with true quality.
+
+The three unsupervised metrics (token ratio, character n‑gram ratio, perplexity) can be computed for every page and every model. We can then:
+
+1. **Rank models** by each metric (e.g., highest token ratio = rank 1).
+2. **Compute Spearman correlation** between the metric’s ranking and the true CER ranking on a small validation set (where GT exists).
+3. **Select the metric with the highest correlation** to evaluate models on the real test pages (which have no GT).
+
+This is exactly the method described in Ströbel et al. (LREC 2022). Future updates will include automated correlation scripts.
+
+---
 
 ## Reference
 
