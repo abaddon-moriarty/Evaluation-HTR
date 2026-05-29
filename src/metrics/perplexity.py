@@ -17,6 +17,7 @@ Example:
     >>> print(f"Perplexity: {ppl:.2f}")
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -42,6 +43,7 @@ class PerplexityScorer:
     Attributes:
         model (kenlm.Model): The loaded KenLM model.
     """
+    
     def __init__(self, model_path: str):
         """
         Initialise the perplexity scorer by loading a KenLM binary model.
@@ -96,10 +98,19 @@ def compute_perplexity(transcription: str, model_path: str) -> float:
 
 if __name__ == "__main__":
     scorer = PerplexityScorer(lm_model_path)
-    test_file = "data/transcription/transcription_etudiant_ex_1/DOC_D/transcription_ouazar__docuementD.txt"
 
-    with open(test_file, "r", encoding="utf-8") as f:
-        raw_text = f.read()
+    for roots, _, files in os.walk(
+        f"{'data/transcription/transcription_etudiant_ex_1'}"
+    ):
+        for file in files:
+            if file.endswith(".txt"):
+                print(file)
+                file_dir = f"{roots}/{file}"
+                try:
+                    with open(file_dir, "r", encoding="latin-1") as f:
+                        raw_text = f.read()
+                except Exception as e:
+                    print(e)
 
-    ppl = scorer.compute_perplexity(raw_text)
-    print(f"Perplexity: {ppl:.2f}")
+                ppl = scorer.compute_perplexity(raw_text)
+                print(f"Perplexity: {ppl:.2f}")
