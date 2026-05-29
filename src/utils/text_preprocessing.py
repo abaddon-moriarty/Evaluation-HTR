@@ -1,4 +1,17 @@
 import re
+import unicodedata
+
+CHARS_TO_REMOVE = set(
+    [
+        "\U0000f158",
+        "\U0000f161",
+        "\U0000e681",
+        "\U0000e665",
+        "\U0000f1a7",
+        "\U0000f217",
+        "\U0000feff",
+    ]
+)
 
 
 def normalize_text(text: str) -> str:
@@ -24,7 +37,7 @@ def normalize_text(text: str) -> str:
     text = re.sub(r"<[^>]*>", "", text)
 
     normalized_text = text.lower()
-    
+
     normalized_text = re.sub(r"\n+", " ", normalized_text)
 
     return re.sub(r"\s+", " ", normalized_text).strip()
@@ -84,3 +97,20 @@ def tokenize_chars(text: str):
         list: List of characters (spaces omitted).
     """
     return list(text.replace(" ", ""))
+
+
+def clean_token(token: str) -> str:
+    clean = unicodedata.normalize("NFC", token)
+
+    clean = "".join(char for char in token if char not in CHARS_TO_REMOVE)
+    return clean
+
+
+if __name__ == "__main__":
+    with open("data/lexicon/general_lexicon.txt", "r", encoding="utf-8") as file:
+        lexicon = file.readlines()
+    for token in lexicon:
+        cleaned = clean_token(token)
+        if cleaned:
+            with open("./test.txt", "a", encoding="utf-8") as f:
+                f.write(cleaned)
