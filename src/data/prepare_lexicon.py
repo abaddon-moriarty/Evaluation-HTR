@@ -165,7 +165,7 @@ def create_lexicon():
         - The function uses global configuration values for default paths
           and repository lists.
     """
-    global corpora_dir, lexicon_output_file
+    global corpora_dir, lexicon_output_file, corpora
 
     if args.output:
         lexicon_output_file = args.output
