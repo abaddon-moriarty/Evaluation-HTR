@@ -10,6 +10,9 @@ CHARS_TO_REMOVE = set(
         "\U0000f1a7",
         "\U0000f217",
         "\U0000feff",
+        "\U0000f143",
+        "\U0000f128",
+        "/",
     ]
 )
 
@@ -35,8 +38,7 @@ def normalize_text(text: str) -> str:
 
     text = re.sub(r"\[[^\]]*\]", "", text)
     text = re.sub(r"<[^>]*>", "", text)
-
-    normalized_text = text.lower()
+    normalized_text = clean_text(text.lower())
 
     normalized_text = re.sub(r"\n+", " ", normalized_text)
 
@@ -99,11 +101,14 @@ def tokenize_chars(text: str):
     return list(text.replace(" ", ""))
 
 
-def clean_token(token: str) -> str:
-    clean = unicodedata.normalize("NFC", token)
+def clean_text(text: str) -> str:
+    return "".join(clean_token(token) for token in text)
 
-    clean = "".join(char for char in token if char not in CHARS_TO_REMOVE)
-    return clean
+
+def clean_token(token: str) -> str:
+    trans_table = str.maketrans({char: " " for char in CHARS_TO_REMOVE})
+    clean = unicodedata.normalize("NFC", token)
+    return clean.translate(trans_table)
 
 
 if __name__ == "__main__":
