@@ -15,7 +15,7 @@ from src.utils.text_preprocessing import normalize_text
 
 config = load_config()
 
-corpora = config["lexicon_corpora_source"]
+corpora_source = config["lexicon_corpora_source"]
 corpora_dir = config["lexicon_corpora_dir_input"]
 lexicon_output_file = config["lexicon_output_file"]
 lexicon_dir_output = config["lexicon_dir_output"]
@@ -165,7 +165,7 @@ def create_lexicon():
         - The function uses global configuration values for default paths
           and repository lists.
     """
-    global corpora_dir, lexicon_output_file, corpora
+    global corpora_dir, lexicon_output_file, corpora_source
 
     if args.output:
         lexicon_output_file = args.output
@@ -181,7 +181,7 @@ def create_lexicon():
                     lexicon.add(line.strip())
 
     if args.download:
-        download_pbar = tqdm(corpora, unit="repository")
+        download_pbar = tqdm(corpora_source, unit="repository")
         for repository in download_pbar:
             download_pbar.set_description_str(f"Cloning {repository}")
             clone_repo(repository)
@@ -202,6 +202,12 @@ def create_lexicon():
             print("Aucun sous-dossier trouvé")
             return
 
+    corpora = [
+        d
+        for d in os.listdir(corpora_dir)
+        if os.path.isdir(os.path.join(corpora_dir, d))
+    ]
+
     lexicon_pbar = tqdm(corpora, unit="corpus")
     for repository in lexicon_pbar:
         repo_path = os.path.join(corpora_dir, repository)
@@ -209,8 +215,6 @@ def create_lexicon():
         transcription = extract_transcription_from_xml(repo_path)
 
         normalized_transcription = normalize_text(transcription)
-        # print(normalized_transcription)
-
         lexicon_pbar.set_description_str("Extracting lexicon")
 
         new_words = extract_lexicon_from_transcription(normalized_transcription)
