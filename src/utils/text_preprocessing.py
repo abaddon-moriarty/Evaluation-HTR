@@ -18,9 +18,9 @@ def normalize_text(text: str) -> str:
 
     # Remove new lines, multiple spaces
     normalized_text = re.sub(r"\n+", " ", normalized_text)
-    normalized_text = re.sub(r"\n+", " ", normalized_text)
 
-    return re.sub(r"\s+", " ", text).strip()
+    return re.sub(r"\s+", " ", normalized_text).strip()
+
 
 
 def tokenize_words(text: str):
