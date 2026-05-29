@@ -22,6 +22,12 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", normalized_text).strip()
 
 
+def normalize_text_for_lm(text: str) -> str:
+    text = re.sub(r"\b\d+\b", "<num>", text.lower())
+    text = re.sub(r"[^\w\s'<>\-]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
 
 def tokenize_words(text: str):
     """
