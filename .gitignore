@@ -219,3 +219,6 @@ __marimo__/
 
 # Corpora used to build lexicon - rebuild from command line
 data/corpora/*
+
+# Transcriptions to evaluate
+data/transcription/*
