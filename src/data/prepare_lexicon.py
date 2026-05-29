@@ -43,7 +43,8 @@ parser.add_argument(
 args = parser.parse_args()
 
 
-def extract_transcription_from_xml(repo_path):
+def extract_transcription_from_xml(repo_path, concatenate=True):
+
     ns = {"alto": "http://www.loc.gov/standards/alto/ns-v4#"}
     transcription = []
     for roots, _, files in os.walk(f"{repo_path}"):
@@ -56,7 +57,12 @@ def extract_transcription_from_xml(repo_path):
                 string_elements = root.findall(".//alto:String", namespaces=ns)
 
                 contents = [elem.get("CONTENT", "") for elem in string_elements]
+                if not concatenate:
+                    transcription.append(contents)
+                    continue
                 transcription.append(" ".join(contents))
+    if not concatenate:
+        return transcription
     return " ".join(transcription)
 
 
