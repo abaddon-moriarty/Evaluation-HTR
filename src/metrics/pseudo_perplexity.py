@@ -21,8 +21,8 @@ class PseudoPerplexityScorer:
             print("CUDA not available. Running on CPU.")
 
         priorities = [
-            # ("magistermilitum/bert_medieval_multilingual", True, None),
-            # ("dbamman/latin-bert", False, self._load_latin_bert),
+            ("magistermilitum/bert_medieval_multilingual", True, None),
+            ("dbamman/latin-bert", False, self._load_latin_bert),
             ("pstroe/roberta-base-latin-cased", True, None),
             ("google-bert/bert-base-multilingual-cased", True, None),
         ]
