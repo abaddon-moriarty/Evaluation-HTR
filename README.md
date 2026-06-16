@@ -7,7 +7,8 @@
 - [x] **Lexicon builder** – downloads medieval corpora from GitHub (CREMMA‑medieval, CREMMA‑MSS‑15/16/17, etc.) and builds a word list from ALTO XML files.
 - [x] **Lexicon‑based metrics** – token ratio and character n‑gram ratio (implemented in `src/metrics/lexical.py`).
 - [x] **Statistical language model perplexity with KenLM** – implemented in `src/metrics/perplexity.py`. Training instructions are provided below.
-- [ ] **Pseudo‑perplexity with BERT (masked language model)** – planned
+- [x] **Pseudo‑perplexity with MLM (masked language model)** – implemented in `src/metrics/pseudo_perplexity.py`. Supports multiple models with automatic fallback (medieval BERT, Latin BERT, multilingual BERT).
+- [x] **Evaluation script** – runs all metrics on student transcriptions and exports results as CSV (src/metrics/metrics_correlation.py).
 - [ ] **Model ranking & Spearman correlation** to validate metrics against a reference ranking – planned
 - [ ] **Integrating modularity** easily adding custom metrics – planned
 - [ ] **Evaluation script** – planned
@@ -215,17 +216,106 @@ print(f"Perplexity: {ppl:.2f}")
 - Absolute values are not meaningful; you **compare perplexities of different models** on the same set of unlabeled pages. The model with the lowest perplexity is considered best by this metric.
 
 ---
+## Pseudo‑perplexity with MLM (Masked Language Model)
 
-## Next steps: combining metrics and ranking models
-Once we have a small ground‑truth validation set, we can compute the Spearman correlation between perplexity ranking and CER ranking to verify that perplexity aligns with true quality.
+Pseudo‑perplexity (Salazar et al., 2020) measures text fluency using a masked language model (MLM) without requiring a dedicated training corpus. It works by masking each token one by one and computing the model's confidence in the original token.
 
-The three unsupervised metrics (token ratio, character n‑gram ratio, perplexity) can be computed for every page and every model. We can then:
+### Implementation
 
-1. **Rank models** by each metric (e.g., highest token ratio = rank 1).
+`src/metrics/pseudo_perplexity.py` provides a `PseudoPerplexityScorer` class that:
+- Automatically attempts to load the best available model from a priority list:
+  1. User‑specified model (via `model_name` argument)
+  2. `magistermilitum/bert_medieval_multilingual` – medieval multilingual BERT
+  3. `dbamman/latin-bert` – Latin BERT
+  4. `pstroe/roberta-base-latin-cased` – Latin RoBERTa
+  5. `google-bert/bert-base-multilingual-cased` – fallback multilingual BERT
+- Processes text in sliding windows (default stride = 256, max_length = 512) to handle long documents.
+- Returns the pseudo‑perplexity value (lower = more fluent).
+
+### How to use
+
+```python
+from src.metrics.pseudo_perplexity import PseudoPerplexityScorer
+
+# Auto‑selects best available model
+scorer = PseudoPerplexityScorer()
+
+# Or specify a particular model
+scorer = PseudoPerplexityScorer(model_name="magistermilitum/bert_medieval_multilingual")
+
+with open("student_transcription.txt", "r") as f:
+    text = f.read()
+
+pppl = scorer.compute_pseudo_perplexity(text)
+print(f"Pseudo‑perplexity: {pppl:.2f}")
+```
+
+### Performance considerations
+
+- The calculation masks each token sequentially, which can be slow for long texts. For initial testing, consider truncating to the first 500–1000 characters.
+- The model is loaded once and reused across calls – cache the scorer instance.
+- If you have a dedicated GPU, set `device="cuda"` to speed up inference.
+
+### Interpreting pseudo‑perplexity
+
+- **Lower is better** – the MLM is more confident in the token predictions, indicating the text follows expected language patterns.
+- Like KenLM perplexity, absolute values are model‑dependent; use them for **ranking** multiple transcriptions, not as an absolute quality score.
+
+---
+
+
+---
+
+## Running the Full Evaluation
+
+Once all metrics are ready, you can run the complete evaluation on all transcription files. You must have multiple models evaluating the same page(s), otherwise you cannot compare the results.
+
+### Command
+
+```bash
+python -m src.metrics.metrics_correlation
+```
+
+### What it does
+
+The script:
+1. Loads the lexicon, KenLM model, and MLM model.
+2. Walks through `data/transcription/transcription_etudiant_ex_1/`.
+3. For each `.txt` file, computes:
+   - Token ratio
+   - Character n‑gram ratio
+   - KenLM perplexity
+   - Pseudo‑perplexity
+4. Exports results to `student_metrics.csv`.
+
+### Output example
+
+| Student                                  | Token ratio | N‑gram ratio | Perplexity | Pseudo‑perplexity |
+|------------------------------------------|-------------|--------------|------------|-------------------|
+| transcription_1_Document_E     | 0.752       | 0.480        | 3016.29    | 1.26e⁸            |
+| Transcription_2_docB      | 0.737       | 0.469        | 3148.49    | 3.94e⁸            |
+| transcription_3_doc_B         | 0.712       | 0.459        | 5204.21    | 1.24e⁸            |
+| transcription_4_documentC        | 0.499       | 0.419        | 21039.33   | 3.91e⁷            |
+
+### Interpreting the output
+
+- **Low perplexity + high token ratio** → likely the best transcriptions
+- **High perplexity + low token ratio** → transcriptions with many errors or out‑of‑vocabulary words.
+- **Pseudo‑perplexity** values are on a different scale – they are useful for ranking but not directly comparable to KenLM perplexity.
+
+---
+
+## Next Steps: Combining Metrics and Ranking Models
+
+Once we have a small ground‑truth validation set, we can compute the Spearman correlation between each metric's ranking and the true CER ranking.
+
+The four unsupervised metrics (token ratio, character n‑gram ratio, KenLM perplexity, pseudo‑perplexity) can be computed for every page and every model. We can then:
+
+1. **Rank models** by each metric (e.g., highest token ratio = rank 1; lowest perplexity = rank 1).
 2. **Compute Spearman correlation** between the metric’s ranking and the true CER ranking on a small validation set (where GT exists).
 3. **Select the metric with the highest correlation** to evaluate models on the real test pages (which have no GT).
 
-This is exactly the method described in Ströbel et al. (LREC 2022). Future updates will include automated correlation scripts.
+This is exactly the method described in Ströbel et al. (LREC 2022).
 
 ---
 
