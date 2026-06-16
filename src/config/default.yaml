@@ -1,6 +1,10 @@
 # Paths
 data_root: "./data"
 
+perplexity:
+  lm_corpus_path: "./data/kenlm_data"
+  lm_model_path: "./data/kenlm_data/model3.arpa.bin"
+
 
 # Lexicon source
 lexicon_corpora_dir_input: "./data/corpora/"
