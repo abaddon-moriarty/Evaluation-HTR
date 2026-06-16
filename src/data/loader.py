@@ -15,7 +15,7 @@ def load_transcriptions(model_dir, page_ids):
         transcription_path = Path(model_dir + page_id)
         if transcription_path.exists():
             with open(transcription_path, "r", encoding="utf-8") as f:
-                transcriptions[page_id] = f.readlines()
+                transcriptions[page_id] = f.read()
         else:
             print(f"Warning: missing {transcription_path}")
 
@@ -37,7 +37,7 @@ def load_ground_truth(gt_dir, page_ids):
         transcription_path = Path(gt_dir + page_id)
         if transcription_path.exists():
             with open(transcription_path, "r", encoding="utf-8") as f:
-                transcriptions[page_id] = f.readlines()
+                transcriptions[page_id] = f.read()
         else:
             print(f"Warning: missing {transcription_path}")
 
